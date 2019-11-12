@@ -1,5 +1,6 @@
 
 
+#setwd("~/Acad/Projects/H-1B")
 
 #Loading dependent packages  ----
 rqrd_Pkg = c('shiny','data.table','plotly','plyr','tidyverse')
@@ -116,15 +117,35 @@ c <- c %>%
   summarize(Approvals = sum(Initial_Approvals), Denials = sum(Initial_Denials),
   C_Approvals = sum(Continuing_Approvals), C_Denials = sum(Continuing_Denials)) %>%
   mutate(Approvals = Approvals, Denials = Denials, C_Approvals = C_Approvals, C_Denials = C_Denials)
-  
+
+top_apr_dept <- c %>%
+  group_by(Dept_Name) %>%
+  summarize(All_apr = sum(Approvals)) %>%
+  arrange(desc(All_apr)) %>%
+  top_n(7) %>%
+  select(Dept_Name)
+
 dept_approval <- c %>%
-  top_n(5,Approvals)
+  filter(Dept_Name %in% top_apr_dept$Dept_Name)
 
-ggplot(dept_approval, aes(x=Year, y=Approvals, color=Dept_Name)) +
-  geom_line()
+  
+dept_approval$Year <- as.numeric(dept_approval$Year)
 
-plot_ly(dept_approval, x = ~Year, y = ~Approvals, type='scatter',mode = 'lines', color = ~Dept_Name) %>%
-  #add_lines()%>%
+apr_plot <- spread(dept_approval[,c('Year','Dept_Name','Approvals')], Dept_Name, Approvals)
+
+# ggplot(dept_approval, aes(x=Year, y=Approvals, color=Dept_Name)) +
+#   geom_line()+
+#   theme_minimal()
+plot_ly(apr_plot, x = ~Year, y=~apr_plot$` Educational Services` , type='scatter', mode='lines') %>%
+  add_lines()%>%
+  #add_trace(x = ~Year, y = ~Denials, type = "scatter", mode = "lines", color = I('red'), name = "Denials") %>%
+  layout(title = "H-1B Visas",
+         xaxis = list(title = "Year"),
+         yaxis = list (title = "Count"))
+
+
+plot_ly(apr_plot, x = ~Year, y=~apr_plot$` Educational Services` , type='scatter', mode='lines') %>%
+  add_lines()%>%
   #add_trace(x = ~Year, y = ~Denials, type = "scatter", mode = "lines", color = I('red'), name = "Denials") %>%
   layout(title = "H-1B Visas",
  xaxis = list(title = "Year"),
