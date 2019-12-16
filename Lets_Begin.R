@@ -3,11 +3,12 @@
 #setwd("~/Acad/Projects/H-1B")
 
 #Updates to do : 
-# Create better plotly plots allowing user inputs
-
+# Create better plotly plots allowing user inputs for years
+# NAISC, Cities csv files from Github
+# More in-depth analysis
 
 #Loading dependent packages  ----
-rqrd_Pkg = c('shiny','data.table','plotly','plyr','tidyverse','ggmap')
+rqrd_Pkg = c('shiny','data.table','plotly','plyr','tidyverse','wordcloud2','ggmap')
 for(p in rqrd_Pkg){
   if(!require(p,character.only = TRUE)) 
   install.packages(p);
@@ -31,8 +32,7 @@ colnames(Data) <- c("Year","Employer","Initial_Approvals","Initial_Denials"
 
 #apply(Data, 2, function(x){sum(is.na(x))})  #check missing values
 Data[is.na(Data)] <- 0  #Replace missing values
-Data  <- Data %>%
-  filter(Year > 2009)  
+ 
 
 ### Is there a decline in approvals----
 a <- Data %>%
@@ -63,6 +63,7 @@ plot_ly(a , x = ~Year, y = ~Approvals, type = "scatter", mode = "lines", color =
 
 ### Top Employers, Industries with most accepts, most denials? -----
 
+#Got the following details from (USCIS) 
 ## Top Industries with most approvals/denials -- NAICS -
 NAICS <-  c(11,21,22,23,31,32,33,42,44,45,48,49,51,52,53,54,55,56,61,62,71,72,81,92,99)
 Dept_Name <- c(' Agriculture, Forestry, Fishing and Hunting',
@@ -91,36 +92,37 @@ Dept_Name <- c(' Agriculture, Forestry, Fishing and Hunting',
    ' Public Administration',
    ' Unknown'
 )
-Dept <- data.frame(NAICS, Dept_Name)
-Dept$NAICS <- as.factor(Dept$NAICS)
+
+Dept <- read.csv("https://raw.githubusercontent.com/SurajMalpani/Shiny_H1b/master/NAICS.csv")
+colnames(Dept) <- c("NAICS","Dept_Name")
+#Dept$NAICS <- as.factor(Dept$NAICS)
 
 
 # ----
 c <- left_join(Data, Dept)
-
 c <- c %>%
   group_by(Year, Dept_Name) %>%
   summarize(Approvals = sum(Initial_Approvals), Denials = sum(Initial_Denials),
   C_Approvals = sum(Continuing_Approvals), C_Denials = sum(Continuing_Denials)) %>%
-  mutate(Denial_Rate = Denials/(Approvals+Denials)*100)
+  mutate(Denial_Rate = round(Denials/(Approvals+Denials)*100, digits=2))
 
-top_apr_dept <- c %>%
-  group_by(Dept_Name) %>%
-  summarize(All_apr = sum(Approvals)) %>%
-  arrange(desc(All_apr)) %>%
-  top_n(7) %>%
-  select(Dept_Name)
-
-dept_approval <- c %>%
-  filter(Dept_Name %in% top_apr_dept$Dept_Name)
-
-dept_approval$Year <- as.numeric(dept_approval$Year)
+# top_apr_dept <- c %>%
+#   group_by(Dept_Name) %>%
+#   summarize(All_apr = sum(Approvals)) %>%
+#   arrange(desc(All_apr)) %>%
+#   top_n(7) %>%
+#   select(Dept_Name)
+# 
+# dept_approval <- c %>%
+#   filter(Dept_Name %in% top_apr_dept$Dept_Name)
+# 
+# dept_approval$Year <- as.numeric(dept_approval$Year)
 
 #Wordcloud
 #require(wordcloud2)
 #wordcloud2(data = dept_approval[c("Dept_Name","Approvals")])
 
-apr_plot <- spread(dept_approval[,c('Year','Dept_Name','Approvals')], Dept_Name, Approvals)
+apr_plot <- spread(c[,c('Year','Dept_Name','Approvals')], Dept_Name, Approvals)
 
 # ggplot(dept_approval, aes(x=Year, y=Approvals, color=Dept_Name)) +
 #   geom_line()+
@@ -138,14 +140,8 @@ plot_ly(c, x = ~Year, y=~Approvals, color =~Dept_Name, type='scatter', mode = 'l
 plot_ly(c, x = ~Year, y=~Denial_Rate, color =~Dept_Name, type='scatter', mode = 'line') %>%
   layout(title = "H-1B Visas Denials Rate by Dept",
          xaxis = list(title = "Year"),
-         yaxis = list (title = "Count"))
+         yaxis = list(range = c(0,50), title = "% Denials"))
 
-plot_ly(apr_plot, x = ~Year, y=~apr_plot$` Educational Services` , type='scatter', mode='lines') %>%
-  add_lines()%>%
-  #add_trace(x = ~Year, y = ~Denials, type = "scatter", mode = "lines", color = I('red'), name = "Denials") %>%
-  layout(title = "H-1B Visas",
- xaxis = list(title = "Year"),
- yaxis = list (title = "Count"))
 
 #### By Employer --------
 ## Need to clean 'Employer' field
@@ -158,22 +154,10 @@ length(unique(trim(drop_words(Data$Employer))))
 
 Data$Employer <- trim(drop_words(Data$Employer))
 
-#Employer wise plot for last two years:
-b <- Data %>%
-  filter(Year > 2017) %>%
-  group_by(Employer) %>%
-  summarize(Approvals = sum(Initial_Approvals), Denials = sum(Initial_Denials),
-            C_Approvals = sum(Continuing_Approvals), C_Denials = sum(Continuing_Denials)) %>%
-  mutate(Denial_Rate = Denials/(Approvals+Denials)*100)
-
-
-employer_wc <- b%>% select(Employer, Approvals) %>% arrange(desc(Approvals)) %>% top_n(15, Approvals)
-
-set.seed(2344575)
-wordcloud2(employer_wc, size = .3, minRotation = 0, maxRotation = 0, color=rep_len( c("blueviolet","darkviolet","blue","darkmagenta","purple","deeppink","darkorchid","brown"), nrow(demoFreq) ), backgroundColor = "white")
 
 ### State, City Wise Analysis ----
-#Plotting top 10 states with max approvals in last 2 years using ggplot
+#Plotting top 10 states with max approvals in last 2 years using plotly
+
 Data %>%
   filter(Year > 2017) %>%
   group_by(State) %>%
@@ -200,31 +184,34 @@ Data %>%
 #     theme_minimal() +
 #     labs(title = "Top 10 states with most Approvals in 2018 & 2019", x="State")
 
+
+
+# Use geocode from ggmap to get lat,lon coordinates
+# get_coords <- function(City){
+#   coords <- geocode(City, source = 'dsk')
+#   df <- cbind(City, coords)
+#   return(df)
+# }
+# 
+# coords_cities <- get_coords(cities$City)
+# write.csv(coords_cities, file='City_Coordinates.csv', row.names=FALSE)
+
+#Preparing cities data
 cities <- Data %>%
   filter(Year > 2017) %>%
   group_by(City) %>%
   summarize(Approvals = sum(Initial_Approvals), Denials = sum(Initial_Denials),
             C_Approvals = sum(Continuing_Approvals), C_Denials = sum(Continuing_Denials)) %>%
   arrange(desc(Approvals)) %>%
-  top_n(100, Approvals)
+  top_n(50, Approvals)
 
+coords_cities <- read.csv("https://raw.githubusercontent.com/SurajMalpani/Shiny_H1b/master/City_Coordinates.csv")
 
-# Use geocode from ggmap to get lat,lon coordinates
-get_coords <- function(City){
-  coords <- geocode(City, source = 'dsk')
-  df <- cbind(City, coords)
-  return(df)
-}
-
-#get_coords(Data[["City"]][1001])  #Google API Limit is 2500 requests per day
-#unique(Data[["City"]])[999]
-
-coords_cities <- get_coords(cities$City)
-cities <- cbind(cities, coords_cities[c("lon","lat")])
+cities <- left_join(cities, coords_cities, by="City")
 
 # geo styling
 g <- list(
-  scope = 'usa',
+  scope = 'north-america',
   showland = TRUE,
   landcolor = toRGB("grey83"),
   subunitcolor = toRGB("white"),
@@ -252,8 +239,31 @@ g <- list(
   )
 )
 
-plot_geo(cities, lat = ~lat, lon = ~lon, color = ~Approvals, size = ~Approvals) %>%
-  add_markers(hovertext = ~(paste("City:", City, "\nNumber of Approvals:", Approvals))) %>%
-  layout(title = 'Top cities with H-1B for 2018 & 2019', geo=g)
+g <- list(
+  scope = 'usa',
+  showland = TRUE,
+  landcolor = toRGB('light gray'),
+  projection = list(type = 'albers usa'),
+  showlakes = TRUE,
+  lakecolor = toRGB('white')
+)
 
+plot_geo(cities, lat = ~lat, lon = ~lon, color = ~Approvals, size=~(Approvals)) %>%
+  add_markers(hovertext = ~(paste("City:", City, "\nNo. of Approvals:", Approvals))) %>%
+  layout(title = 'Top cities with H-1B Approvals in 2018 & 2019', geo=g)
+
+
+#Employer wise wordcloud for last two years:
+b <- Data %>%
+  filter(Year > 2017) %>%
+  group_by(Employer) %>%
+  summarize(Approvals = sum(Initial_Approvals), Denials = sum(Initial_Denials),
+            C_Approvals = sum(Continuing_Approvals), C_Denials = sum(Continuing_Denials)) %>%
+  mutate(Denial_Rate = Denials/(Approvals+Denials)*100)
+
+
+employer_wc <- b %>% select(Employer, Approvals) %>% arrange(desc(Approvals)) %>% top_n(15, Approvals)
+
+set.seed(2344575)
+wordcloud2(employer_wc, size = .25, minRotation = 0, maxRotation = 0, color=rep_len( c("blueviolet","darkviolet","blue","darkmagenta","purple","deeppink","darkorchid","brown"), nrow(demoFreq) ), backgroundColor = "white")
 
