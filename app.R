@@ -2,22 +2,35 @@
 # This is a Shiny web application for interacting with H1-B Data.
 # Author: Suraj Malpani
 #
+#########---######---
 
 #Loading dependent packages
-rqrd_Pkg = c('shiny','data.table','plotly','plyr','tidyverse','wordcloud2')
+rqrd_Pkg = c('shiny','data.table','plotly','plyr','tidyverse')
 for(p in rqrd_Pkg){
   if(!require(p,character.only = TRUE)) 
     install.packages(p);
   library(p,character.only = TRUE)
 }
 
-
 # Define UI for application that draws a histogram
 ui <- navbarPage("H-1B Visas Analysis",
              tabPanel("All Data",
                   DT::dataTableOutput("table1")), 
              tabPanel("Approvals vs Declines",
-                      plotlyOutput("plot1")),
+                      sidebarLayout(sidebarPanel(
+                        helpText()),
+                        mainPanel(plotlyOutput("plot1"))
+                        )),
+             tabPanel("Geographic",
+                      sidebarLayout(sidebarPanel(
+                        checkboxGroupInput(inputId = "Year", label = "Select Years",
+                                           choices = c(2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019),
+                                           selected = c(2018,2019))
+                      ),
+                      mainPanel(
+                        plotlyOutput("states"),
+                        plotlyOutput("cities"))
+                      )),
              tabPanel("Departments",
                       fluidRow(
                         helpText("\n
@@ -27,13 +40,9 @@ ui <- navbarPage("H-1B Visas Analysis",
                         helpText("\n
                                  Denial Rate is the percentage of denials over all the applications.
                                  \n As we can see all the deparments are witnessing more denials since 2016."),
-                        plotlyOutput("dept_denial"))),
-             tabPanel("Geographic",
-                      plotlyOutput("states"),
-                      plotlyOutput("cities"))
-             
+                        plotlyOutput("dept_denial"))
+                      )
 )
-
 
 
 # Define server logic required to draw a histogram  -----------
@@ -61,6 +70,7 @@ server <- function(input, output) {
   Data$Employer <- trim(drop_words(Data$Employer))
   
   Data <- cbind(Data[1:6],apply(Data[7:11],2,as.factor))
+  Data$Employer <- as.factor(Data$Employer)
   
   ## Top Industries with most approvals/denials -- NAICS ----
   Dept <- read.csv("https://raw.githubusercontent.com/SurajMalpani/Shiny_H1b/master/NAICS.csv")
@@ -76,17 +86,7 @@ server <- function(input, output) {
     mutate(Denial_Rate = round(Denials/(Approvals+Denials)*100, digits=2))
   
   #Preparing cities data
-  cities <- Data %>%
-    filter(Year > 2017) %>%
-    group_by(City) %>%
-    summarize(Approvals = sum(Initial_Approvals), Denials = sum(Initial_Denials),
-              C_Approvals = sum(Continuing_Approvals), C_Denials = sum(Continuing_Denials)) %>%
-    arrange(desc(Approvals)) %>%
-    top_n(50, Approvals)
-  
   coords_cities <- read.csv("https://raw.githubusercontent.com/SurajMalpani/Shiny_H1b/master/City_Coordinates.csv")
-  cities <- left_join(cities, coords_cities, by="City")
-  
   
   #Creating all Output objects -------
   output$table1 <- DT::renderDataTable({
@@ -130,7 +130,7 @@ server <- function(input, output) {
   #Plotting top 10 states with max approvals in last 2 years using plotly
   output$states <- renderPlotly({
     Data %>%
-      filter(Year > 2017) %>%
+      filter(Year %in% input$Year) %>%
       group_by(State) %>%
       summarize(Approvals = sum(Initial_Approvals), Denials = sum(Initial_Denials),
                 C_Approvals = sum(Continuing_Approvals), C_Denials = sum(Continuing_Denials)) %>%
@@ -138,7 +138,7 @@ server <- function(input, output) {
       top_n(10, Approvals) %>%
       plot_ly(x= ~(factor(State, levels=unique(State))[order(Approvals, decreasing = TRUE)]), 
               y=~Approvals, type='bar') %>%
-      layout(title = "Top 10 States with highest Approvals in 2018, 2019",
+      layout(title = "Top 10 states with highest approvals in the selected Years",
              xaxis = list(title = "State"),
              yaxis = list(title = "Approvals"))
   })
@@ -155,13 +155,18 @@ server <- function(input, output) {
   
   # Plot of top cities
   output$cities <- renderPlotly({
-  plot_geo(cities, lat = ~lat, lon = ~lon, color = ~Approvals, size = ~Approvals) %>%
-    add_markers(hovertext = ~(paste("City:", City, "\nNo. of Approvals:", Approvals))) %>%
-    layout(title = 'Top cities with H-1B Approvals in 2018 & 2019', geo=g)
+    Data %>%
+      filter(Year %in% input$Year) %>%
+      group_by(City) %>%
+      summarize(Approvals = sum(Initial_Approvals), Denials = sum(Initial_Denials),
+                C_Approvals = sum(Continuing_Approvals), C_Denials = sum(Continuing_Denials)) %>%
+      arrange(desc(Approvals)) %>%
+      top_n(50, Approvals) %>%
+      left_join(coords_cities, by="City") %>%
+      plot_geo(lat = ~lat, lon = ~lon, color = ~Approvals, size=~(Approvals)) %>%
+      add_markers(hovertext = ~(paste("City:", City, "\nNo. of Approvals:", Approvals))) %>%
+      layout(title = 'Top cities with H-1B Visa approvals in the selected Years', geo=g)
   })
-  
-
-
 }
 
 
