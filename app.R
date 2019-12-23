@@ -15,10 +15,12 @@ for(p in rqrd_Pkg){
 # Define UI for application that draws a histogram
 ui <- navbarPage("H-1B Visas Analysis",
              tabPanel("All Data",
-                  DT::dataTableOutput("table1")), 
+                      downloadButton('downloadData', 'Download'),
+                      DT::dataTableOutput("table1")), 
              tabPanel("Approvals vs Declines",
                       sidebarLayout(sidebarPanel(
-                        helpText()),
+                        helpText("The total number of approvals and denials in the following graph, we realize that since 2015, approvals are dwindling.", 
+                                 "On the other hand, denials are surging.")),
                         mainPanel(plotlyOutput("plot1"))
                         )),
              tabPanel("Geographic",
@@ -33,9 +35,8 @@ ui <- navbarPage("H-1B Visas Analysis",
                       )),
              tabPanel("Departments",
                       fluidRow(
-                        helpText("\n
-                                  Department wise approvals over the years. \n
-                                 You can select which particular deparment you wish to look at by clicking or double clicking on the department name in the plot legends."),
+                        helpText("Department wise approvals over the years.",
+                                 "Note: You can select which particular deparment you wish to look at by clicking or double clicking on the department name in the plot legends."),
                         plotlyOutput("dept_approval"),
                         helpText("\n
                                  Denial Rate is the percentage of denials over all the applications.
@@ -93,6 +94,14 @@ server <- function(input, output) {
     Data
   }, filter='top', 
   options = list(pageLength = 10, scrollX=TRUE, autoWidth = TRUE, columnDefs = list(list(width = '200px', targets = 2))))
+  
+  ## Download Buttons ----
+  output$downloadData <- downloadHandler(
+    filename = 'Download.csv',
+    content = function(file) {
+      write.csv(Data[input[["table1_rows_all"]],], file, row.names = FALSE)
+    }
+  )
   
   #plotly chart of total approvals and denials:
   output$plot1 <- renderPlotly({
