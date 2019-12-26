@@ -12,6 +12,6 @@ Data description [here](https://www.uscis.gov/tools/reports-studies/understandin
 - Code.R : general code file without the shiny app
 
 ## Project Description:
-Read details [here](https://towardsdatascience.com/plotly-with-r-shiny-495f19f4aba3)
+Read details [at this blog post](https://towardsdatascience.com/plotly-with-r-shiny-495f19f4aba3?source=email-5120c2f3f19-1577358081933-layerCake.autoLayerCakeWriterNotification-------------------------6471b704_c8c4_431b_bf5a_40d68373a439&sk=366de9b1ef5eb64033f262362e5b41f5.)
 
 
