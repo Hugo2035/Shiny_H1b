@@ -1,3 +1,4 @@
+library(plotly)
 navbarPage("H-1B Visas Analysis",
            tabPanel("All Data",
                     downloadButton('downloadData', 'Download'),

@@ -1,14 +1,26 @@
 function(input, output) {
   
+  rqrd_Pkg = c('shiny','plotly','plyr','tidyverse','ggmap')
+  for(p in rqrd_Pkg){
+    #if(!require(p,character.only = TRUE)) 
+    # install.packages(p);
+    library(p,character.only = TRUE)
+  }
+  
   file_link = "https://www.uscis.gov/sites/default/files/USCIS/Data/Employment-based/H-1B/h1b_datahubexport-All.zip"
   temp <- tempfile()
   download.file(file_link, temp)
   temp_2 = unzip(temp)
   
-  #Load the Data 
-  Data <- ldply(temp_2, fread)
+  # temp_2 = c("h1b_datahubexport-2009.csv","h1b_datahubexport-2010.csv","h1b_datahubexport-2011.csv"
+  # ,"h1b_datahubexport-2012.csv","h1b_datahubexport-2013.csv","h1b_datahubexport-2014.csv"
+  # ,"h1b_datahubexport-2015.csv","h1b_datahubexport-2016.csv","h1b_datahubexport-2017.csv"
+  # ,"h1b_datahubexport-2018.csv","h1b_datahubexport-2019.csv")
+  
+  #Load the data 
+  Data <- purrr::map_dfr(temp_2, readr::read_csv)
   columns <-c("Initial Approvals", "Initial Denials", "Continuing Approvals", "Continuing Denials")
-  Data[, columns] <- lapply(columns, function(x) as.numeric(Data[[x]]))
+  Data[, columns] <- purrr::map(columns, function(x) as.numeric(Data[[x]]))
   
   # Data Cleaning and transformation
   colnames(Data) <- c("Year","Employer","Initial_Approvals","Initial_Denials"    
@@ -26,6 +38,7 @@ function(input, output) {
   
   ## Top Industries with most approvals/denials -- NAICS ----
   Dept <- read.csv("https://raw.githubusercontent.com/SurajMalpani/Shiny_H1b/master/NAICS.csv")
+  #Dept <- read_csv("NAICS.csv")
   colnames(Dept) <- c("NAICS","Dept_Name")
   Dept$NAICS <- as.factor(Dept$NAICS)
   
@@ -39,6 +52,7 @@ function(input, output) {
   
   #Preparing cities data
   coords_cities <- read.csv("https://raw.githubusercontent.com/SurajMalpani/Shiny_H1b/master/City_Coordinates.csv")
+  #coords_cities <- read_csv("City_Coordinates.csv")
   
   #Creating all Output objects -------
   output$table1 <- DT::renderDataTable({
