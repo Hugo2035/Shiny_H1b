@@ -1,6 +1,6 @@
 function(input, output) {
   
-  rqrd_Pkg = c('shiny','plotly','plyr','tidyverse','ggmap')
+  rqrd_Pkg = c('shiny','plotly','plyr','tidyverse','ggmap','DT')
   for(p in rqrd_Pkg){
     if(!require(p,character.only = TRUE)) 
     install.packages(p);
